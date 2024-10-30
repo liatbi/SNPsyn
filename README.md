@@ -37,10 +37,13 @@ The output is stored in the specified output directory and contains annotated SN
    * Within non-coding DNA.
 
 **Examples**
- Run SNPsyn with reference and query genome:
+
+Run SNPsyn with reference and query genome:
+ 
 bash ./SNPsyn.sh SNPsyn -r /path/to/reference.fasta -q /path/to/query.fasta --ref_name ref_name --query_name query_name -o /path/to/output
 
 Run SNPsyn with reference and query genome:
+
 bash ./SNPsyn.sh SNPsyn -r /path/to/reference.fasta -q /path/to/query2.fasta --ref_name ref_name --query_name query_name --python_path ./SNPsyn_scripts/SNPsyn_python.py -o /path/to/output -k Bacteria -g Salmonella --threads 4
 
 
