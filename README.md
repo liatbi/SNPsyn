@@ -24,14 +24,17 @@ Query: A FASTA file containing the query genome(s).
 **Output**
 The output is stored in the specified output directory and contains annotated SNP files with the following details:
 1. POS- SNP Positions: Position information of each identified SNP compared to the reference genome
-2. SNP Type:
+2. gene_pos: The position of the SNP in the ORF- (first nucleotide in the orf will be in position "1")
+3. SNP Type:
    * Synonym: SNPs that do not change the encoded amino acid.
    * Non-synonym: SNPs that result in an amino acid change.
    * Indel: Insertions or deletions.
    * ncDNA: SNPs located in non-coding DNA regions.
-3. ORF SNPs: Number of SNPs identified in each open reading frame (ORF).
-4. SNPs in the ORF Context- the same annotation will be given to all the SNPs in the ORF
-   * Whether the SNPs within the ORF lead to stop codons 
+4. ORF SNPs: Number of SNPs identified in each open reading frame (ORF).
+5. protein_pident
+6. SNPs in the ORF Context- the same annotation will be given to all the SNPs in the ORF
+   * frame_shift - one or two indels in a row that made a frame shift
+   * premature_stop_codon- the SNPs within the ORF lead to stop codons 
    * Amino acid changes (annotation in case there is no stop codon)
    * Synonymous mutations
    * Within non-coding DNA.
