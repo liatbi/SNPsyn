@@ -53,12 +53,12 @@ Run SNPsyn with reference and query genome:
 bash ./SNPsyn.sh SNPsyn -r /path/to/reference.fasta -q /path/to/query2.fasta --ref_name ref_name --query_name query_name --python_path ./SNPsyn_scripts/SNPsyn_python.py -o /path/to/output -k Bacteria -g Salmonella --threads 4
 
 
--r, --ref            Reference file path (required)"
---ref_name           Reference name, string (optional)"
--q, --query          Query file and query name (required; can be repeated for multiple pairs)"
---query_name         Query name, string (optional)"
--o, --output_dir     Output directory for results (optional, defaults to the current directory)"
---python_path        path to the python file (optional, default- file exists in the current directory)"
--k, --kingdom        Optional kingdom (default Bacteria)"
--g, --genus          Optional genus (default Escherichia)"
--t, --threads        Optional - number of threads (default=8)"
+-r, --ref            Reference file path (required)   
+--ref_name           Reference name, string (optional)  
+-q, --query          Query file and query name (required; can be repeated for multiple pairs)  
+--query_name         Query name, string (optional)  
+-o, --output_dir     Output directory for results (optional, defaults to the current directory)  
+--python_path        path to the python file (optional, default- file exists in the current directory)  
+-k, --kingdom        Optional kingdom (default Bacteria)  
+-g, --genus          Optional genus (default Escherichia)  
+-t, --threads        Optional - number of threads (default=8)  
