@@ -26,7 +26,7 @@ usage() {
     echo "  --python_path        path to the python file (optional,default- file exist in current directory)"
     echo "  -k, --kingdom        Optional kingdom (default Bacteria)"
     echo "  -g, --genus          Optional genus (default Escherichia)"
-    echo "  -t, --threads            Optional - number of threads (default=8)"
+    echo "  -t, --threads        Optional - number of threads (default=8)"
     echo "  -h, --help           Show this help message"
     exit 1
 }
@@ -115,6 +115,11 @@ mummer_results=$MUMMER_OUT/output
 PROKKA_OUT=$temp/prokka_output
 SNPsyn_output=$output_dir/$ref_name
 
+
+single_SNPs_output=$SNPsyn_output/$ref_name"_"$query_name"_single_SNPs_output".csv
+orf_snp_output=$SNPsyn_output/$ref_name"_"$query_name"_orf_snp_output".csv
+summary=$SNPsyn_output/$ref_name"_"$query_name"_SNPsyn_summary".csv
+
 mkdir $output_dir $temp $MUMMER_OUT $mummer_delta $mummer_results $PROKKA_OUT $SNPsyn_output
 
 # MUMmer run 
@@ -134,4 +139,6 @@ echo "start prokka run"
 #then 2 ouputs - csv with snps and summary file
 
 echo "calculates synonym vs nonsynonym snps"
-python $python_path $mummer_results/$ref_name"_"$query_name.txt  $PROKKA_OUT/$ref_name.gff $ref $SNPsyn_output/$ref_name"_"$query_name"_SNPsyn".csv $SNPsyn_output/$ref_name"_"$query_name"_SNPsyn_summary".csv
+
+python $python_path $mummer_results/$ref_name"_"$query_name.txt  $PROKKA_OUT/$ref_name.gff $ref $single_SNPs_output $orf_snp_output $summary 
+

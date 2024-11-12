@@ -7,11 +7,22 @@ import sys
 mummer_snps_path = sys.argv[1]
 prokka_path = sys.argv[2]
 fasta_path = sys.argv[3]
-output_file = sys.argv[4]  # Output filename
-summary_file = sys.argv[5]  # summary file
+output_file_single_snps = sys.argv[4]  # Output filename
+output_file_orf_snps = sys.argv[5]  # Output filename
+summary_file = sys.argv[6]  # summary file
 
 mummer_snps = pd.read_csv(mummer_snps_path, header=2, sep="\t")
-orf_df = pd.read_csv(prokka_path, sep='\t', header=2)
+
+#count number of lines with hash (not to include in the prokka df)
+with open(prokka_path, 'r') as file:
+    hash_lines=0
+    for line in file:
+        if '##' in line:
+            print(line)
+            hash_lines+=1
+# Read the prokka df
+orf_df = pd.read_csv(prokka_path, sep='\t', header=(hash_lines-1))
+#orf_df = pd.read_csv(prokka_path, sep='\t', header=2)
 
 # df for ref vs strain - mummer output into df
 # order the column names correctly
@@ -21,13 +32,22 @@ cols.extend(['ref_contig', 'strain_contig'])  # add columns name contig
 mummer_snps.reset_index(inplace=True)
 mummer_snps.columns = cols
 mummer_snps.rename(columns={'P1': 'POS', 'SUB': 'REF', 'SUB.1': 'ALT'}, inplace=True)
-# find main contig - and make a df only with the main (without plasmids)
-main_contig = mummer_snps[
-    'ref_contig'].value_counts().idxmax()  # find the main contig of the strain ( in case of  multiple contigs)
-mummer_snps = mummer_snps[mummer_snps['ref_contig'] == main_contig]  # use only main contig (drop snps from plasmids)
+
+#find main contig - and make a df only with the main (without plasmids) - for ref
+main_contig_ref = None
+max_length = 0
+ref_sequence = None
+# Parse through each contig in the FASTA file
+for record in SeqIO.parse(fasta_path, 'fasta'):
+    # Update if this contig is longer than the current longest
+    if len(record.seq) > max_length:
+        main_contig_ref = record.id
+        max_length = len(record.seq)
+        ref_sequence=record
+mummer_snps = mummer_snps[mummer_snps['ref_contig'] == main_contig_ref]  # use only main contig (drop snps from plasmids)
 print("number of snps positions (unique per position): ", len(mummer_snps['POS'].unique()))
 print("number of snps: ", len(mummer_snps['POS']))
-mummer_snps
+
 
 # prokka output to get orfs
 # shift the column row to first row and set column names
@@ -83,9 +103,11 @@ snps_orf_df = snps_orf_df.merge(num_of_snps_in_orf, on='ID', how='left')
 #add position within the coding region - the first position in gene is "1"
 snps_orf_df.loc[snps_orf_df['strand']=='+', 'snp_pos_in_gene']=snps_orf_df['POS']-snps_orf_df['start']+1
 snps_orf_df.loc[snps_orf_df['strand']=='-','snp_pos_in_gene']=snps_orf_df['end']-snps_orf_df['POS']+1
+snps_orf_df['gene_len']=abs(snps_orf_df['end']-snps_orf_df['start'])
+snps_orf_df[['ID','start','end','gene_len','strand']]
 
-# add syn or non syn for orf for single snp
-ref_sequence = SeqIO.read(fasta_path, 'fasta')
+
+#add syn or non syn
 syn = 0;
 nonsyn = 0;
 wrong = 0;
@@ -126,15 +148,12 @@ for index, row in snps_orf_df[snps_orf_df['feature_type'] != 'ncDNA'].iterrows()
             else:
                 nonsyn += 1
                 snps_orf_df.at[index, 'syn_nonsyn'] = 'nonsyn'
-        #    snps_orf_df.at[index, 'nonsyn_type'] = 'AA_change'
         else:
             wrong += 1
     else:
-        indel += 1
+        indel+= 1
         snps_orf_df.at[index, 'syn_nonsyn'] = 'indel'
-        # snps_orf_df.at[index, 'syn_nonsyn'] = 'nonsyn
-        # snps_orf_df.at[index, 'nonsyn_type'] = 'indel'
-dna_sequence
+
 print(syn, nonsyn, indel, wrong)
 snps_orf_df
 
@@ -144,10 +163,7 @@ snps_orf_df
 
 
 
-#add syn or non syn for whole orf and pident
-ref_sequence=SeqIO.read(fasta_path, 'fasta')
-snps_orf_df['orf_syn_non_syn'] = None
-#snps_orf_df['orf_syn_non_syn_type'] = None
+#add syn or non syn for whole orf with coverage precent identity
 for orf in snps_orf_df['ID'].dropna().unique(): #go orf by orf
     alt_ref_sequence=ref_sequence #initializing the sequence
     start=int(snps_orf_df[snps_orf_df['ID']==orf]['start'].iloc[0]) #strat and and should be similar to all snps in the orf
@@ -194,9 +210,13 @@ for orf in snps_orf_df['ID'].dropna().unique(): #go orf by orf
 
     #shorten the protein in case of premature_stop_codon
     stop_codon_position = alt_protein_seq.find('*')
+
+    #check if there is new stop codon in the middle of the protein
     if (stop_codon_position>-1) & (stop_codon_position+1!=len(protein_seq)):
-        snps_orf_df.loc[snps_orf_df['ID'] == orf, 'orf_syn_non_syn'] = 'premature_stop_codon'
-        alt_protein_seq=alt_protein_seq[:stop_codon_position+1]
+        snps_orf_df.loc[snps_orf_df['ID'] == orf, 'premature_stop_codon'] = True
+        alt_protein_seq=alt_protein_seq[:stop_codon_position+1] #update the protein length (for the alignment)
+    else:
+        snps_orf_df.loc[snps_orf_df['ID'] == orf, 'premature_stop_codon'] = False
 
     #pident calculation per protein
     aligner = Align.PairwiseAligner()
@@ -211,14 +231,18 @@ for orf in snps_orf_df['ID'].dropna().unique(): #go orf by orf
     matches = sum([AA1==AA2 for AA1, AA2 in zip(*best_alignment)])
     alignment_length = best_alignment.shape[1]  # Length of aligned region
     protein_percent_identity = (matches / alignment_length) * 100
-    snps_orf_df.loc[snps_orf_df['ID'] == orf, 'protein_pident'] =protein_percent_identity.round(3)
+    snps_orf_df.loc[snps_orf_df['ID'] == orf, 'protein_covpident'] =protein_percent_identity.round(3)
+
 
     #adding meaning of syn non syn in case of all the orf contect
+    #check if there is frame_shift
     if (dna_sequence!=alt_dna_sequence): #dna should not be the same this should always be true
         if (protein_seq==alt_protein_seq): #whole protein is synonym
             syn+=1
-            snps_orf_df.loc[snps_orf_df['ID'] == orf, 'orf_syn_non_syn'] = 'syn'
+            snps_orf_df.loc[snps_orf_df['ID'] == orf, 'protein_changed'] = False
+            snps_orf_df.loc[snps_orf_df['ID'] == orf, 'frame_shift'] = False
         else: #non synonym
+            snps_orf_df.loc[snps_orf_df['ID'] == orf, 'protein_changed'] = True
             #check if there is frame shift
             frame_shift=False
             orf_indels= snps_orf_df[(snps_orf_df['ID'] == orf) & (snps_orf_df['syn_nonsyn']=='indel')]
@@ -235,28 +259,31 @@ for orf in snps_orf_df['ID'].dropna().unique(): #go orf by orf
                             # print(len(codon_df))
                             break
             if frame_shift==True:
-                snps_orf_df.loc[snps_orf_df['ID'] == orf, 'orf_syn_non_syn'] = 'frame_shift'
+                snps_orf_df.loc[snps_orf_df['ID'] == orf, 'frame_shift'] = True
             else:
-                #check if there is new stop codon in the middle of the protein
-                stop_codon_position = alt_protein_seq.find('*')
-                if (stop_codon_position>-1) & (stop_codon_position+1!=len(protein_seq)):
-                    snps_orf_df.loc[snps_orf_df['ID'] == orf, 'orf_syn_non_syn'] = 'premature_stop_codon'
-                else:
-                    snps_orf_df.loc[snps_orf_df['ID'] == orf, 'orf_syn_non_syn'] = 'AA_changes'
+                snps_orf_df.loc[snps_orf_df['ID'] == orf, 'frame_shift'] = False
 
-# fill in the syn_nonsyn column if it non coding dna etc...
-snps_orf_df['orf_syn_non_syn'].fillna(snps_orf_df['feature_type'], inplace=True)
-snps_orf_df
 
-SNPsyn_output = snps_orf_df[
-    ['ID', 'POS', 'REF', 'ALT', 'strand', 'feature_type', 'num_of_snps_in_orf', 'syn_nonsyn', 'orf_syn_non_syn',
-     'start', 'end', 'product', 'Name', 'gene', 'ref_contig', 'strain_contig', 'P2', 'attributes', 'source', 'phase',
-     'BUFF', 'DIST', 'LEN R', 'LEN Q', 'FRM', 'TAGS', 'score']]  # 'nonsyn_type'
-SNPsyn_output
+# # fill in the syn_nonsyn column if it non coding dna etc...
+# snps_orf_df['orf_syn_non_syn'].fillna(snps_orf_df['feature_type'], inplace=True)
+# snps_orf_df
 
+#generate snp output per snp
+SNPsyn_output_single_snp = snps_orf_df[[
+    'ID','POS','snp_pos_in_gene','gene_len','REF','ALT','strand','feature_type', 'num_of_snps_in_orf','syn_nonsyn',
+    'start', 'end', 'product','Name','gene','ref_contig', 'strain_contig','P2','attributes', 'source','phase','BUFF'
+    , 'DIST', 'LEN R', 'LEN Q', 'FRM', 'TAGS' ,'score']]
+
+#generate snp output per orf
+SNPsyn_output_orf=snps_orf_df.groupby(['ID'])['gene_len','strand','feature_type', 'num_of_snps_in_orf','start', 'end','protein_covpident','protein_changed','premature_stop_codon','frame_shift','product', 'ref_contig','strain_contig','feature_type', 'gene','Name'].first().reset_index()
+
+
+#generate summary file
 summary_SNPsyn = snps_orf_df['syn_nonsyn'].value_counts()
-summary_SNPsyn
+print(summary_SNPsyn)
+
 
 # export
-SNPsyn_output.to_csv(output_file, index=False)
+SNPsyn_output_single_snp.to_csv(output_file_single_snps, index=False)
+SNPsyn_output_orf.to_csv(output_file_orf_snps, index=False)
 summary_SNPsyn.to_csv(summary_file)
