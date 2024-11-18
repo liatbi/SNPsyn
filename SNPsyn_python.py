@@ -11,6 +11,14 @@ output_file_single_snps = sys.argv[4]  # Output filename
 output_file_orf_snps = sys.argv[5]  # Output filename
 summary_file = sys.argv[6]  # summary file
 
+# ref='A1' ; strain='D1'
+# mummer_snps_path=rf'C:\Users\UriGoNB1\OneDrive - mail.tau.ac.il\Desktop\Liat\outputs\quasispecies\pat003\Mummer_strain_comparison\{ref}_{strain}.txt'
+# prokka_path=fr'C:\Users\UriGoNB1\OneDrive - mail.tau.ac.il\Desktop\Liat\outputs\quasispecies\pat003\synonymous_vs_non_synonymous\prokka_gff_for_orf\{ref}.gff'
+# fasta_path=r'C:\Users\UriGoNB1\OneDrive - mail.tau.ac.il\Desktop\Liat\outputs\isolates\H7JFRZ_1_sample_A1.fna'
+# output_file_single_snps= r'C:\Users\UriGoNB1\OneDrive - mail.tau.ac.il\Desktop\Liat\test1'
+# output_file_orf_snps= r'C:\Users\UriGoNB1\OneDrive - mail.tau.ac.il\Desktop\Liat\test2'
+# summary_file= r'C:\Users\UriGoNB1\OneDrive - mail.tau.ac.il\Desktop\Liat\test3'
+
 mummer_snps = pd.read_csv(mummer_snps_path, header=2, sep="\t")
 
 #count number of lines with hash (not to include in the prokka df)
@@ -18,8 +26,9 @@ with open(prokka_path, 'r') as file:
     hash_lines=0
     for line in file:
         if '##' in line:
-            print(line)
+     #       print(line)
             hash_lines+=1
+
 # Read the prokka df
 orf_df = pd.read_csv(prokka_path, sep='\t', header=(hash_lines-1))
 #orf_df = pd.read_csv(prokka_path, sep='\t', header=2)
@@ -55,6 +64,7 @@ orf_df = orf_df.shift(1)
 orf_df.iloc[0] = orf_df.columns
 orf_df.columns = ['ref_contig', 'source', 'feature_type', 'start', 'end', 'score', 'strand', 'phase', 'attributes']
 orf_df.dropna(subset='feature_type', inplace=True)
+orf_df=orf_df[orf_df['ref_contig'] == main_contig_ref] #use only main contig (drop snps from plasmids)
 # convert start and stop to int
 orf_df['start'] = orf_df['start'].astype(int)
 orf_df['end'] = orf_df['end'].astype(int)
@@ -66,28 +76,28 @@ orf_df['gene'] = orf_df['attributes'].str.split('gene=').str[1].str.split(';').s
 orf_df['product'] = orf_df['attributes'].str.split('product=').str[1].str.split(';').str[0]
 orf_df
 
-# add the ID from the prokka df that suitable for the position of the snip
+
+#add the ID from the prokka df that suitable for the position of the snip
 for pos in (mummer_snps['POS'].unique()):
-    ID_df = orf_df[(orf_df['start'] < pos) & (orf_df['end'] > pos)]['attributes']
-    if ID_df.empty:  # snp not in orf
-        pass
-    elif len(ID_df) == 1:  # one orf
-        ID = ID_df.item()
-        mummer_snps.loc[mummer_snps['POS'] == pos, 'attributes'] = ID
-    else:  # more than one orf
-        orf_count = len(ID_df)  # numbers of orfs
-        IDs = ID_df.tolist()
-        rows_to_duplicate = mummer_snps[mummer_snps['POS'] == pos]
-        # add first ID
-        ID = IDs[0]
-        print(IDs)
-        mummer_snps.loc[mummer_snps['POS'] == pos, 'attributes'] = ID
-        for ID in IDs[1:]:
-            new_rows = rows_to_duplicate.copy()
-            new_rows['attributes'] = ID
-            mummer_snps = pd.concat([mummer_snps, new_rows], ignore_index=True)
-            print(pos)
-mummer_snps.sort_values(by=['POS', 'attributes'], inplace=True, ascending=True)
+    ID_df=orf_df[(orf_df['start']<pos) & (orf_df['end']>pos)]['attributes']
+    if ID_df.empty: #snp not in orf
+            pass
+    elif len(ID_df)==1: #one orf
+        ID=ID_df.item()
+        mummer_snps.loc[mummer_snps['POS']==pos,'attributes']=ID
+    else: #more than one orf
+        orf_count=len(ID_df) #numbers of orfs
+        IDs=ID_df.to_list()
+        rows_to_duplicate=mummer_snps[mummer_snps['POS'] == pos]
+        #add first ID
+        ID=IDs[0]
+#        print(pos, IDs)
+        mummer_snps.loc[mummer_snps['POS']==pos,'attributes']=ID
+        for ID in IDs[1:]: # start from second ID
+            new_row=rows_to_duplicate.copy()
+            new_row['attributes']=ID
+            mummer_snps=pd.concat([mummer_snps,new_row], ignore_index=True)
+mummer_snps.sort_values(by=['POS','attributes'], inplace=True, ascending=True)
 
 
 # merge with orf df to get merged snps with its gene orf and info
